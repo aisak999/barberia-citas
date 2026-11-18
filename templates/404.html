@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block cuerpo %}
+<header class="cabecera">
+  <div class="logo">{% include "_tijeras.html" %}</div>
+  <h1>{{ n.nombre }}</h1>
+</header>
+<main class="contenedor centro">
+  <h2>No encontramos esa página</h2>
+  <p class="pequeno">Puede que el link esté incompleto.</p>
+  <a class="btn btn-principal" href="{{ url_for('inicio') }}">Reservar una cita</a>
+</main>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titulo %}Entrar · {{ n.nombre }}{% endblock %}
+{% block cabeza %}<link rel="manifest" href="{{ url_for('manifest') }}">{% endblock %}
+{% block cuerpo %}
+<header class="cabecera">
+  <div class="logo">{% include "_tijeras.html" %}</div>
+  <h1>Panel del barbero</h1>
+  <p>{{ n.nombre }}</p>
+</header>
+<main class="contenedor">
+  <form method="post" class="tarjeta">
+    {% for m in get_flashed_messages() %}<div class="alerta">{{ m }}</div>{% endfor %}
+    <label class="campo">Clave
+      <input type="password" name="clave" required autofocus autocomplete="current-password">
+    </label>
+    {% if demo %}<p class="pequeno">Clave de prueba: <b>barbero123</b></p>{% endif %}
+    <button class="btn btn-principal btn-bloque">Entrar</button>
+  </form>
+</main>
+{% endblock %}

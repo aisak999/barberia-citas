@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titulo %}Tu cita · {{ n.nombre }}{% endblock %}
+{% block cuerpo %}
+<header class="cabecera">
+  <div class="logo">{% include "_tijeras.html" %}</div>
+  <h1>{{ n.nombre }}</h1>
+  <p>{{ n.direccion }}</p>
+</header>
+
+<main class="contenedor">
+  <div class="tarjeta">
+    {% if cita.estado == 'cancelada' %}
+      <h2 class="centro">Cita cancelada</h2>
+      <p class="centro pequeno">Esta cita ya no está activa.</p>
+    {% else %}
+      <div class="ok-icono">✓</div>
+      <h2 class="centro" style="margin:4px 0">¡Cita {{ 'completada' if cita.estado == 'completada' else 'confirmada' }}!</h2>
+      <p class="centro pequeno">{{ '¡Gracias por venir' if cita.estado == 'completada' else 'Te esperamos' }}, {{ cita.nombre.split()[0] }}{{ '!' if cita.estado == 'completada' else '.' }}</p>
+    {% endif %}
+
+    <ul class="detalle">
+      <li><span>Servicio</span><b>{{ cita.servicio }}</b></li>
+      <li><span>Día</span><b>{{ cita.inicio | fecha_larga }}</b></li>
+      <li><span>Hora</span><b>{{ cita.inicio | hora12 }}</b></li>
+      <li><span>Precio</span><b>{{ cita.precio | dinero }}</b></li>
+      <li><span>Estado</span><b class="estado {{ cita.estado }}">{{ cita.estado | capitalize }}</b></li>
+    </ul>
+
+    {% if cita.estado == 'pendiente' and futura %}
+      <p class="pequeno"><b>Para que no se te olvide</b>, agrégala a tu calendario y tu celular te avisa 1 hora antes:</p>
+      <a class="btn btn-negro btn-bloque" href="{{ google }}" target="_blank" rel="noopener">📅 Agregar a Google Calendar</a>
+      <a class="btn btn-bloque" href="{{ url_for('calendario_ics', token=cita.token) }}">🍎 Agregar al calendario del iPhone</a>
+      <a class="btn btn-wa btn-bloque" href="{{ whatsapp }}" target="_blank" rel="noopener">Escribirle al barbero</a>
+
+      <form method="post" action="{{ url_for('cancelar_cita', token=cita.token) }}"
+            onsubmit="return confirm('¿Seguro que quieres cancelar tu cita?')">
+        <button class="btn btn-peligro btn-bloque">Cancelar mi cita</button>
+      </form>
+      <p class="pequeno centro">Guarda este link: aquí puedes ver o cancelar tu cita.</p>
+    {% else %}
+      <a class="btn btn-principal btn-bloque" href="{{ url_for('inicio') }}">Reservar otra cita</a>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}

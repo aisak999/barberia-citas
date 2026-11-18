@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block titulo %}Reservar cita · {{ n.nombre }}{% endblock %}
+{% block cuerpo %}
+<header class="cabecera">
+  <div class="logo">{% include "_tijeras.html" %}</div>
+  <h1>{{ n.nombre }}</h1>
+  <p>{{ n.direccion }}</p>
+</header>
+
+<form method="post" action="{{ url_for('reservar') }}" id="f" class="contenedor">
+  {% for m in get_flashed_messages() %}<div class="alerta">{{ m }}</div>{% endfor %}
+
+  <h2 class="paso"><span>1</span> Elige el servicio</h2>
+  <div class="servicios">
+    {% for s in servicios %}
+    <label class="servicio opcion">
+      <input type="radio" name="servicio" value="{{ s.id }}" data-nombre="{{ s.nombre }}" data-precio="{{ s.precio | dinero }}" required>
+      <span class="s-nombre">{{ s.nombre }}</span>
+      <span class="s-info">{{ s.minutos }} min</span>
+      <span class="s-precio">{{ s.precio | dinero }}</span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <h2 class="paso"><span>2</span> Elige el día</h2>
+  <div class="dias">
+    {% for d in dias %}
+    <label class="dia opcion {% if not d.abierto or d.lleno %}cerrado{% endif %}">
+      <input type="radio" name="fecha" value="{{ d.fecha }}" data-texto="{{ d.semana }} {{ d.num }} {{ d.mes }}" {% if not d.abierto or d.lleno %}disabled{% endif %} required>
+      <small>{{ d.semana }}</small><b>{{ d.num }}</b>
+      <small>{% if not d.abierto %}Cerrado{% elif d.lleno %}Lleno{% else %}{{ d.mes }}{% endif %}</small>
+    </label>
+    {% endfor %}
+  </div>
+
+  <h2 class="paso"><span>3</span> Elige la hora</h2>
+  <div class="horas" id="horas"><p class="nota">Primero elige el servicio y el día.</p></div>
+
+  <h2 class="paso"><span>4</span> Tus datos</h2>
+  <label class="campo">Tu nombre
+    <input name="nombre" required maxlength="60" autocomplete="name" placeholder="Ej: Juan Pérez">
+  </label>
+  <label class="campo">Tu WhatsApp
+    <input name="telefono" required inputmode="tel" autocomplete="tel" placeholder="Ej: 809-555-1234">
+  </label>
+
+  <div class="barra">
+    <div class="resumen" id="resumen">Elige servicio, día y hora</div>
+    <button class="btn btn-principal" id="enviar" disabled>Reservar</button>
+  </div>
+</form>
+
+<script>
+const f = document.getElementById('f');
+const horas = document.getElementById('horas');
+const marcado = n => f.querySelector(`input[name="${n}"]:checked`);
+
+async function cargarHoras() {
+  const s = marcado('servicio'), d = marcado('fecha');
+  if (!s || !d) return;
+  horas.innerHTML = '<p class="nota">Buscando horas libres…</p>';
+  const r = await fetch(`/api/horas?fecha=${d.value}&servicio=${s.value}`);
+  const lista = await r.json();
+  horas.innerHTML = lista.length
+    ? lista.map(h => `<label class="hora opcion"><input type="radio" name="hora" value="${h.valor}" data-texto="${h.texto}" required><span>${h.texto}</span></label>`).join('')
+    : '<p class="nota">No quedan horas libres ese día. Prueba con otro día.</p>';
+  actualizar();
+}
+
+function actualizar() {
+  const s = marcado('servicio'), d = marcado('fecha'), h = marcado('hora');
+  const listo = s && d && h && f.nombre.value.trim() && f.telefono.value.replace(/\D/g, '').length >= 10;
+  document.getElementById('enviar').disabled = !listo;
+  document.getElementById('resumen').innerHTML = s
+    ? `<b>${s.dataset.nombre}</b> · ${s.dataset.precio}<br>${d ? d.dataset.texto : 'Elige el día'}${h ? ' · ' + h.dataset.texto : ''}`
+    : 'Elige servicio, día y hora';
+}
+
+f.addEventListener('change', e => {
+  if (e.target.name === 'servicio' || e.target.name === 'fecha') cargarHoras();
+  if (e.target.name === 'fecha') horas.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  actualizar();
+});
+f.addEventListener('input', actualizar);
+f.addEventListener('submit', () => { const b = document.getElementById('enviar'); b.disabled = true; b.textContent = 'Reservando…'; });
+</script>
+{% endblock %}

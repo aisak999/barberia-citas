@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block titulo %}Citas · {{ n.nombre }}{% endblock %}
+{% block cabeza %}
+<link rel="manifest" href="{{ url_for('manifest') }}">
+{% if vista in ('hoy', 'manana', 'proximas') %}<meta http-equiv="refresh" content="60">{% endif %}{# las citas se actualizan solas cada minuto #}
+{% endblock %}
+
+{% macro lista_horas(nombre, elegida) %}
+<select name="{{ nombre }}">
+  {% for h in HORAS_LISTA %}<option value="{{ h }}" {{ 'selected' if h == elegida }}>{{ h | hora12 }}</option>{% endfor %}
+</select>
+{% endmacro %}
+
+{% block cuerpo %}
+<header class="panel-top">
+  <div class="logo">{% include "_tijeras.html" %}</div>
+  <h1>{{ n.nombre }}<small>{{ hoy | fecha_larga }}</small></h1>
+  <a href="?vista=compartir" class="btn-link-top">📲 Mi link</a>
+  <a href="{{ url_for('salir') }}">Salir</a>
+</header>
+
+<main class="contenedor" style="padding-bottom:40px">
+  <div class="stats">
+    <div class="stat"><b>{{ stats.total }}</b><span>citas hoy</span></div>
+    <div class="stat"><b>{{ stats.pendientes }}</b><span>por atender</span></div>
+    <a class="stat" href="?vista=reportes"><b>{{ stats.ganado | dinero }}</b><span>ganado hoy</span></a>
+  </div>
+
+  <nav class="tabs">
+    <a href="?vista=hoy" class="{{ 'activo' if vista == 'hoy' }}">Hoy</a>
+    <a href="?vista=manana" class="{{ 'activo' if vista == 'manana' }}">Mañana</a>
+    <a href="?vista=proximas" class="{{ 'activo' if vista == 'proximas' }}">Próximas</a>
+    <a href="?vista=reportes" class="{{ 'activo' if vista == 'reportes' }}">📊 Reportes</a>
+    <a href="?vista=libres" class="{{ 'activo' if vista == 'libres' }}">🌴 Días libres</a>
+    <a href="?vista=ajustes" class="{{ 'activo' if vista == 'ajustes' }}">⚙️ Ajustes</a>
+  </nav>
+
+  {% for m in get_flashed_messages() %}<div class="alerta">{{ m }}</div>{% endfor %}
+
+  {# ======================= DÍAS LIBRES ======================= #}
+  {% if vista == 'libres' %}
+    <form method="post" action="{{ url_for('agregar_libre') }}" class="tarjeta" id="form-libre">
+      <h3 class="sub">1. ¿Qué día no vas a trabajar?</h3>
+      <div class="dias">
+        {% for d in dias %}
+        <label class="dia opcion {{ 'cerrado' if not d.trabaja }} {{ 'marcado-libre' if d.trabaja and not d.abierto }}">
+          <input type="radio" name="fecha" value="{{ d.fecha }}" {{ 'disabled' if not d.trabaja or not d.abierto }} required>
+          <small>{{ d.semana }}</small><b>{{ d.num }}</b>
+          <small>{% if not d.trabaja %}No abres{% elif not d.abierto %}Libre{% else %}{{ d.mes }}{% endif %}</small>
+        </label>
+        {% endfor %}
+      </div>
+
+      <h3 class="sub">2. ¿Todo el día o solo unas horas?</h3>
+      <div class="dos">
+        <label class="grande opcion"><input type="radio" name="tipo" value="dia" checked><span>🌴</span>Todo el día</label>
+        <label class="grande opcion"><input type="radio" name="tipo" value="horas"><span>⏰</span>Solo unas horas</label>
+      </div>
+
+      <div class="rango" id="rango" hidden>
+        <label class="campo">Desde {{ lista_horas('desde', '12:00') }}</label>
+        <label class="campo">Hasta {{ lista_horas('hasta', '14:00') }}</label>
+      </div>
+
+      <label class="campo">Motivo <span class="pequeno">(opcional, solo lo ves tú)</span>
+        <input name="motivo" maxlength="80" placeholder="Ej: médico, viaje, diligencia">
+      </label>
+      <button class="btn btn-principal btn-bloque">Guardar</button>
+    </form>
+
+    <h3 class="dia-titulo">Tus días y horas libres</h3>
+    {% if bloqueos %}
+      <ul class="lista-bloqueos">
+        {% for b in bloqueos %}
+        <li>
+          <div>
+            <b>{{ b.fecha | fecha_larga }}</b><br>
+            <span class="pequeno">{% if b.desde %}De {{ b.desde | hora12 }} a {{ b.hasta | hora12 }}{% else %}Todo el día{% endif %}{% if b.motivo %} · {{ b.motivo }}{% endif %}</span>
+          </div>
+          <form method="post" action="{{ url_for('quitar_libre', id=b.id) }}"><button class="btn btn-chico">Quitar</button></form>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="pequeno">No tienes días libres marcados.</p>
+    {% endif %}
+
+    <script>
+    const fl = document.getElementById('form-libre');
+    fl.addEventListener('change', () => {
+      document.getElementById('rango').hidden = fl.querySelector('input[name="tipo"]:checked').value !== 'horas';
+    });
+    </script>
+
+  {# ======================= AJUSTES ======================= #}
+  {% elif vista == 'ajustes' %}
+    <form method="post" action="{{ url_for('guardar_horario') }}" class="tarjeta seccion">
+      <h3 class="sub">🕘 Horario de cada semana</h3>
+      <p class="pequeno">Apaga los días que nunca abres. Para un día suelto usa "Días libres".</p>
+      {% for d in range(7) %}{% set h = horario[d] %}
+      <div class="dia-fila">
+        <label class="switch"><input type="checkbox" name="abierto{{ d }}" value="1" {{ 'checked' if h.abre }}><span></span></label>
+        <b class="dia-nombre">{{ DIAS[d] }}</b>
+        <div class="horas-dia">
+          {{ lista_horas('abre' ~ d, h.abre or '09:00') }}
+          <span class="pequeno">a</span>
+          {{ lista_horas('cierra' ~ d, h.cierra or '19:00') }}
+        </div>
+      </div>
+      {% endfor %}
+      <button class="btn btn-negro btn-bloque">Guardar horario</button>
+    </form>
+
+    <form method="post" action="{{ url_for('guardar_servicios') }}" class="tarjeta seccion" id="servicios">
+      <h3 class="sub">💈 Servicios y precios</h3>
+      {% for s in servicios %}
+      <div class="serv-fila">
+        <input name="nombre{{ s.id }}" value="{{ s.nombre }}" maxlength="40" aria-label="Nombre del servicio" class="serv-nombre">
+        <label class="mini">Min.<select name="minutos{{ s.id }}">{% for m in range(5, 125, 5) %}<option {{ 'selected' if m == s.minutos }}>{{ m }}</option>{% endfor %}</select></label>
+        <label class="mini">RD$<input name="precio{{ s.id }}" value="{{ s.precio }}" type="number" min="0" step="50" inputmode="numeric"></label>
+        <label class="quitar"><input type="checkbox" name="borrar{{ s.id }}" value="1"> Quitar</label>
+      </div>
+      {% endfor %}
+      <div class="serv-fila nuevo">
+        <input name="nuevo_nombre" maxlength="40" placeholder="+ Agregar servicio nuevo" class="serv-nombre">
+        <label class="mini">Min.<select name="nuevo_minutos">{% for m in range(5, 125, 5) %}<option {{ 'selected' if m == 30 }}>{{ m }}</option>{% endfor %}</select></label>
+        <label class="mini">RD$<input name="nuevo_precio" type="number" min="0" step="50" placeholder="0" inputmode="numeric"></label>
+      </div>
+      <button class="btn btn-negro btn-bloque">Guardar servicios</button>
+    </form>
+
+    <form method="post" action="{{ url_for('guardar_negocio') }}" class="tarjeta seccion">
+      <h3 class="sub">🏠 Datos de la barbería</h3>
+      <label class="campo">Nombre<input name="nombre" value="{{ n.nombre }}" maxlength="40" required></label>
+      <label class="campo">Dirección<input name="direccion" value="{{ n.direccion }}" maxlength="100"></label>
+      <label class="campo">WhatsApp de la barbería<input name="whatsapp" value="{{ n.whatsapp }}" inputmode="tel"></label>
+      <button class="btn btn-negro btn-bloque">Guardar datos</button>
+    </form>
+
+    <form method="post" action="{{ url_for('cambiar_clave') }}" class="tarjeta seccion" id="clave">
+      <h3 class="sub">🔒 Cambiar clave</h3>
+      <label class="campo">Clave actual<input type="password" name="actual" required autocomplete="current-password"></label>
+      <label class="campo">Clave nueva<input type="password" name="nueva" required minlength="6" autocomplete="new-password"></label>
+      <label class="campo">Repite la clave nueva<input type="password" name="repetir" required minlength="6" autocomplete="new-password"></label>
+      <button class="btn btn-negro btn-bloque">Cambiar clave</button>
+    </form>
+
+  {# ======================= REPORTES ======================= #}
+  {% elif vista == 'reportes' %}
+    <div class="seg">
+      <a href="?vista=reportes&periodo=dia" class="{{ 'activo' if periodo == 'dia' }}">Día</a>
+      <a href="?vista=reportes&periodo=semana" class="{{ 'activo' if periodo == 'semana' }}">Semana</a>
+      <a href="?vista=reportes&periodo=mes" class="{{ 'activo' if periodo == 'mes' }}">Mes</a>
+    </div>
+
+    <section class="total-card">
+      <div class="nav-periodo">
+        <a href="?vista=reportes&periodo={{ periodo }}&fecha={{ anterior }}" aria-label="Anterior">‹</a>
+        <div><b>{{ titulo }}</b><small>{{ rango }}</small></div>
+        {% if siguiente %}<a href="?vista=reportes&periodo={{ periodo }}&fecha={{ siguiente }}" aria-label="Siguiente">›</a>{% else %}<span></span>{% endif %}
+      </div>
+      <div class="total-grande">{{ total | dinero }}</div>
+      <div class="total-sub">ganado · {{ cantidad }} cliente{{ '' if cantidad == 1 else 's' }} atendido{{ '' if cantidad == 1 else 's' }}{% if cantidad %} · promedio {{ promedio | dinero }}{% endif %}</div>
+    </section>
+
+    {% if sin_marcar %}
+    <div class="tarjeta seccion sin-marcar">
+      <h3 class="sub">⚠ ¿Vinieron estos clientes?</h3>
+      <p class="pequeno">Estas citas ya pasaron pero no las marcaste. Solo se cuenta como ganancia lo que marcas como <b>Atendido</b>.</p>
+      {% for c in sin_marcar %}
+      <div class="fila-marcar">
+        <div><b>{{ c.nombre }}</b><br><span class="pequeno">{{ c.inicio | fecha_larga }}, {{ c.inicio | hora12 }} · {{ c.servicio }} · {{ c.precio | dinero }}</span></div>
+        <div class="acciones-marcar">
+          <form method="post" action="{{ url_for('cambiar_estado', id=c.id, estado='completada') }}"><button class="btn btn-negro btn-chico">✓ Vino</button></form>
+          <form method="post" action="{{ url_for('cambiar_estado', id=c.id, estado='cancelada') }}"><button class="btn btn-peligro btn-chico">No vino</button></form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if por_servicio %}
+    <div class="tarjeta seccion">
+      <h3 class="sub">💈 Por servicio</h3>
+      <table class="tabla">
+        <tr><th>Servicio</th><th class="num">Cant.</th><th class="num">Total</th></tr>
+        {% for nombre, s in por_servicio %}
+        <tr><td>{{ nombre }}</td><td class="num">{{ s.cantidad }}</td><td class="num"><b>{{ s.total | dinero }}</b></td></tr>
+        {% endfor %}
+        <tr class="fila-total"><td>Total</td><td class="num">{{ cantidad }}</td><td class="num">{{ total | dinero }}</td></tr>
+      </table>
+    </div>
+
+    <div class="tarjeta seccion">
+      <h3 class="sub">🧾 Detalle de cada corte</h3>
+      {% for fecha, citas in por_dia.items() %}
+        {% if periodo != 'dia' %}
+        <div class="detalle-dia"><span>{{ fecha | fecha_larga }}</span><b>{{ citas | sum(attribute='precio') | dinero }}</b></div>
+        {% endif %}
+        {% for c in citas %}
+        <div class="fila-detalle">
+          <span class="hora-chica">{{ c.inicio | hora12 }}</span>
+          <div><b>{{ c.nombre }}</b><br><span class="pequeno">{{ c.servicio }}</span></div>
+          <b>{{ c.precio | dinero }}</b>
+        </div>
+        {% endfor %}
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="vacio">Todavía no hay clientes atendidos en este período.<br>
+        <span class="pequeno">Cuando termines un corte, márcalo como <b>✓ Atendido</b> y aparece aquí.</span></div>
+    {% endif %}
+
+  {# ======================= MI LINK (botón de arriba) ======================= #}
+  {% elif vista == 'compartir' %}
+    <a href="?vista=hoy" class="volver">‹ Volver a mis citas</a>
+    {% if es_local %}
+    <div class="alerta">⚠ Todavía no está publicado en internet. Por ahora este link solo abre en celulares
+      conectados al <b>mismo Wi-Fi</b> que la computadora, y solo mientras el programa esté abierto.</div>
+    {% endif %}
+
+    <section class="compartir-hero">
+      <h3>📲 Tu link para clientes</h3>
+      <p>Mándaselo a tus clientes y ellos solitos reservan.</p>
+      <div class="link-grande" id="link">{{ link }}</div>
+      <div class="botones-compartir">
+        <button class="btn btn-principal" type="button" onclick="copiar('link', this)">📋 Copiar link</button>
+        <a class="btn btn-wa" href="https://wa.me/?text={{ mensaje | urlencode }}" target="_blank" rel="noopener">Enviar por WhatsApp</a>
+        <button class="btn btn-blanco" type="button" id="btn-compartir" hidden onclick="compartir()">↗ Compartir</button>
+      </div>
+    </section>
+
+    <div class="tarjeta seccion centro">
+      <h3 class="sub">🔳 Código QR</h3>
+      <p class="pequeno">El cliente lo escanea con la cámara del celular y le sale la página para reservar.</p>
+      <img src="{{ url_for('qr_svg') }}" alt="Código QR del link" class="qr">
+      <a class="btn btn-negro btn-bloque" href="{{ url_for('cartel') }}" target="_blank">🖨 Imprimir cartel para la barbería</a>
+      <a class="btn btn-bloque" href="{{ url_for('qr_svg') }}" download="qr-citas.svg">⬇ Descargar QR</a>
+    </div>
+
+    <div class="tarjeta seccion">
+      <h3 class="sub">🤖 Que le llegue solo al que te escriba</h3>
+      <ol class="pasos-wa">
+        <li>Abre <b>WhatsApp Business</b>.</li>
+        <li>Ve a <b>Herramientas para la empresa → Mensaje de bienvenida</b> y actívalo.</li>
+        <li>Borra el mensaje que trae y pega este:</li>
+      </ol>
+      <div class="mensaje-listo" id="mensaje">{{ mensaje }}</div>
+      <button class="btn btn-negro btn-bloque" type="button" onclick="copiar('mensaje', this)">📋 Copiar mensaje</button>
+      <p class="pequeno">Así, cada cliente que te escriba recibe el link solo, sin que tú hagas nada.</p>
+    </div>
+
+    <script>
+    function copiar(id, boton) {
+      const texto = document.getElementById(id).textContent.trim();
+      // el portapapeles solo funciona con https o localhost; si falla, se muestra el texto para copiarlo a mano
+      (navigator.clipboard ? navigator.clipboard.writeText(texto) : Promise.reject())
+        .then(() => { const t = boton.textContent; boton.textContent = '✓ ¡Copiado!'; setTimeout(() => boton.textContent = t, 2000); })
+        .catch(() => prompt('Copia esto:', texto));
+    }
+    // En celulares sale el menú nativo de "Compartir" (WhatsApp, Instagram, Facebook...)
+    if (navigator.share) document.getElementById('btn-compartir').hidden = false;
+    function compartir() {
+      navigator.share({ title: {{ n.nombre | tojson }}, text: 'Reserva tu cita aquí:', url: {{ link | tojson }} }).catch(() => {});
+    }
+    </script>
+
+  {# ======================= CITAS ======================= #}
+  {% else %}
+    {% for fecha, citas in grupos.items() %}
+      {% if vista == 'proximas' %}<h3 class="dia-titulo">{{ fecha | fecha_larga }}</h3>{% endif %}
+      {% for x in citas %}
+      <article class="cita {{ x.estado }}">
+        <div class="hora-grande">{{ x.inicio | hora12 }}<small>{{ x.duracion }} min</small></div>
+        <div>
+          <div class="nombre">{{ x.nombre }}</div>
+          <div class="info">{{ x.servicio }} · {{ x.precio | dinero }}</div>
+          <div class="info">{{ x.telefono }}</div>
+        </div>
+        <div class="acciones">
+          {% if x.estado == 'pendiente' %}
+            <a class="btn btn-wa btn-chico" href="{{ x.wa }}" target="_blank" rel="noopener">Recordar por WhatsApp</a>
+            <a class="btn btn-chico" href="tel:{{ x.telefono }}">Llamar</a>
+            {% if x.puede_atender %}
+            <form method="post" action="{{ url_for('cambiar_estado', id=x.id, estado='completada') }}">
+              <button class="btn btn-negro btn-chico">✓ Atendido</button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('cambiar_estado', id=x.id, estado='cancelada') }}"
+                  onsubmit='return confirm({{ ("¿Cancelar la cita de " ~ x.nombre ~ "?") | tojson }})'>
+              <button class="btn btn-peligro btn-chico">Cancelar</button>
+            </form>
+          {% else %}
+            <span class="estado completada">Atendido</span>
+            <form method="post" action="{{ url_for('cambiar_estado', id=x.id, estado='pendiente') }}">
+              <button class="btn btn-chico">Deshacer</button>
+            </form>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    {% else %}
+      <div class="vacio">
+        <b>No hay citas {{ {'hoy': 'para hoy', 'manana': 'para mañana'}.get(vista, 'próximas') }}.</b><br>
+        <a href="?vista=compartir">📲 Comparte tu link</a> con tus clientes para que reserven.
+      </div>
+    {% endfor %}
+  {% endif %}
+</main>
+{% endblock %}

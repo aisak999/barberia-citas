@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cartel · {{ n.nombre }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page { size: letter; margin: 0; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { margin: 0; background: #ddd; font-family: "Inter", system-ui, sans-serif; }
+    .hoja {
+      width: 8.5in; min-height: 11in; margin: 20px auto; background: #0f0f0f; color: #fff;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      padding: .7in .6in; position: relative; overflow: hidden;
+    }
+    .hoja::before, .hoja::after {
+      content: ""; position: absolute; left: 0; right: 0; height: 22px;
+      background: repeating-linear-gradient(-45deg, #f5b800 0 22px, #0f0f0f 22px 44px);
+    }
+    .hoja::before { top: 0; } .hoja::after { bottom: 0; }
+    .logo { width: 110px; height: 110px; border-radius: 50%; background: #f5b800; color: #0f0f0f; display: grid; place-items: center; box-shadow: 0 0 0 6px #0f0f0f, 0 0 0 10px #f5b800; }
+    .logo svg { width: 60px; height: 60px; }
+    .nombre { font-family: "Oswald", sans-serif; font-size: 40px; text-transform: uppercase; letter-spacing: .04em; margin: 22px 0 0; }
+    h1 { font-family: "Oswald", sans-serif; font-size: 78px; line-height: 1; margin: 26px 0 8px; color: #f5b800; text-transform: uppercase; }
+    .sub { font-size: 24px; margin: 0 0 30px; color: #e9e4d8; }
+    .qr { background: #fff; padding: 22px; border-radius: 24px; border: 8px solid #f5b800; }
+    .qr img { width: 4in; height: 4in; display: block; }
+    .pasos { display: flex; gap: 28px; margin: 34px 0 18px; font-size: 20px; font-weight: 600; }
+    .pasos span { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #f5b800; color: #0f0f0f; margin-right: 8px; font-family: "Oswald", sans-serif; }
+    .link { font-size: 18px; color: #bdb8ad; word-break: break-all; }
+    .imprimir { position: fixed; right: 16px; bottom: 16px; padding: 14px 22px; font: 700 17px "Inter", sans-serif; background: #f5b800; border: 0; border-radius: 12px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+    @media print { body { background: none; } .hoja { margin: 0; } .imprimir { display: none; } }
+    @media (max-width: 8.5in) { .hoja { transform-origin: top left; } }
+  </style>
+</head>
+<body>
+  <div class="hoja">
+    <div class="logo">{% include "_tijeras.html" %}</div>
+    <div class="nombre">{{ n.nombre }}</div>
+    <h1>Reserva tu cita</h1>
+    <p class="sub">Sin esperar · Sin llamar · En 1 minuto</p>
+    <div class="qr"><img src="{{ url_for('qr_svg') }}" alt="Código QR"></div>
+    <div class="pasos">
+      <div><span>1</span>Abre la cámara</div>
+      <div><span>2</span>Apunta al código</div>
+      <div><span>3</span>Elige tu hora</div>
+    </div>
+    <div class="link">{{ link }}</div>
+  </div>
+  <button class="imprimir" onclick="window.print()">🖨 Imprimir</button>
+</body>
+</html>
